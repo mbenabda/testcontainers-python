@@ -17,13 +17,13 @@ class CosmosDBNoSQLEndpointContainer(CosmosDBEmulatorContainer):
 
     Example:
 
-        .. code-block:: python
+        .. doctest::
 
             >>> from testcontainers.cosmosdb import CosmosDBNoSQLEndpointContainer
             >>> with CosmosDBNoSQLEndpointContainer() as emulator:
             ...   db = emulator.insecure_sync_client().create_database_if_not_exists("test")
 
-        .. code-block:: python
+        .. doctest::
 
             >>> from testcontainers.cosmosdb import CosmosDBNoSQLEndpointContainer
             >>> from azure.cosmos import CosmosClient
@@ -35,7 +35,7 @@ class CosmosDBNoSQLEndpointContainer(CosmosDBEmulatorContainer):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(endpoint_ports=[NOSQL_PORT], **kwargs)
+        super().__init__(**kwargs)
 
     @property
     def port(self) -> str:
@@ -63,7 +63,11 @@ class CosmosDBNoSQLEndpointContainer(CosmosDBEmulatorContainer):
         """
         return SyncCosmosClient(url=self.url, credential=self.key, connection_verify=False)
 
+    def _configure(self) -> None:
+        super()._configure()
+        self.with_exposed_ports(NOSQL_PORT)
+
     @wait_container_is_ready(ServiceRequestError)
-    def _wait_for_query_success(self) -> None:
+    def _wait_for_endpoint_ready(self) -> None:
         with self.insecure_sync_client() as c:
             list(c.list_databases())

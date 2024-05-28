@@ -1,7 +1,6 @@
 import os
 import socket
 import ssl
-from collections.abc import Iterable
 from distutils.util import strtobool
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
@@ -37,16 +36,12 @@ class CosmosDBEmulatorContainer(DockerContainer):
             "AZURE_COSMOS_EMULATOR_KEY",
             "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==",
         ),
-        bind_ports: bool = strtobool(os.getenv("AZURE_COSMOS_EMULATOR_BIND_PORTS", "true")),
-        endpoint_ports: Iterable[int] = [],
         **other_kwargs,
     ):
         super().__init__(image=image, **other_kwargs)
-        self.endpoint_ports = endpoint_ports
         self.partition_count = partition_count
         self.key = key
         self.enable_data_persistence = enable_data_persistence
-        self.bind_ports = bind_ports
 
     @property
     def host(self) -> str:
@@ -65,17 +60,14 @@ class CosmosDBEmulatorContainer(DockerContainer):
     def start(self) -> Self:
         self._configure()
         super().start()
-        self._wait_until_ready()
+        self._wait_until_started()
         self._cert_pem_bytes = self._download_cert()
+        self._wait_for_endpoint_ready()
+
         return self
 
     def _configure(self) -> None:
-        all_ports = {EMULATOR_PORT, *self.endpoint_ports}
-        if self.bind_ports:
-            for port in all_ports:
-                self.with_bind_ports(port, port)
-        else:
-            self.with_exposed_ports(*all_ports)
+        self.with_exposed_ports(EMULATOR_PORT)
 
         (
             self.with_env("AZURE_COSMOS_EMULATOR_PARTITION_COUNT", str(self.partition_count))
@@ -84,15 +76,6 @@ class CosmosDBEmulatorContainer(DockerContainer):
             .with_env("AZURE_COSMOS_EMULATOR_KEY", str(self.key))
         )
 
-    def _wait_until_ready(self) -> Self:
-        wait_for_logs(container=self, predicate="Started\\s*$")
-
-        if self.bind_ports:
-            self._wait_for_url(f"https://{self.host}:{EMULATOR_PORT}/_explorer/index.html")
-            self._wait_for_query_success()
-
-        return self
-
     def _download_cert(self) -> bytes:
         with grab.file(
             self.get_wrapped_container(),
@@ -100,11 +83,17 @@ class CosmosDBEmulatorContainer(DockerContainer):
         ) as cert:
             return cert.read()
 
+    def _wait_until_started(self) -> Self:
+        wait_for_logs(container=self, predicate="Started\\s*$")
+        self._wait_for_url(f"https://{self.host}:{self.get_exposed_port(EMULATOR_PORT)}/_explorer/index.html")
+
+        return self
+
     @wait_container_is_ready(HTTPError, URLError)
     def _wait_for_url(self, url: str) -> Self:
         with urlopen(url, context=ssl._create_unverified_context()) as response:
             response.read()
         return self
 
-    def _wait_for_query_success(self) -> None:
+    def _wait_for_endpoint_ready(self) -> None:
         pass

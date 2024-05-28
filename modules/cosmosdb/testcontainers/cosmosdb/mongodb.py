@@ -13,13 +13,14 @@ class CosmosDBMongoEndpointContainer(CosmosDBEmulatorContainer):
 
     Example:
 
-        .. code-block:: python
+        .. doctest::
 
             >>> from testcontainers.cosmosdb import CosmosDBMongoEndpointContainer
 
             >>> with CosmosDBMongoEndpointContainer(mongodb_version="4.0") as emulator:
-            ...   print(f"Point your MongoDB client at {emulator.host}:{emulator.port} using key {emulator.key}")
-            ...   print(f"and eiher disable TLS server auth or trust the server's self signed cert (emulator.server_certificate_pem)")
+            ...   # Point your MongoDB client at {emulator.host}:{emulator.port} using key {emulator.key}
+            ...   # and eiher disable TLS server auth or trust the server's self signed cert (emulator.server_certificate_pem)
+            ...   pass
 
     """
 
@@ -31,7 +32,7 @@ class CosmosDBMongoEndpointContainer(CosmosDBEmulatorContainer):
         ),
         **other_kwargs,
     ):
-        super().__init__(image=image, endpoint_ports=[ENDPOINT_PORT], **other_kwargs)
+        super().__init__(image=image, **other_kwargs)
         assert mongodb_version is not None, "A MongoDB version is required to use the MongoDB Endpoint"
         self.mongodb_version = mongodb_version
 
@@ -44,4 +45,5 @@ class CosmosDBMongoEndpointContainer(CosmosDBEmulatorContainer):
 
     def _configure(self) -> None:
         super()._configure()
+        self.with_exposed_ports(ENDPOINT_PORT)
         self.with_env("AZURE_COSMOS_EMULATOR_ENABLE_MONGODB_ENDPOINT", self.mongodb_version)
